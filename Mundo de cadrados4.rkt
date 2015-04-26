@@ -4,6 +4,9 @@
 
 (define l-cadrado 15)
 
+;;COMENTARIO
+(define git 1)
+
 (define l-cadrado-a l-cadrado)
 
 (define n-c-ancho 50)
