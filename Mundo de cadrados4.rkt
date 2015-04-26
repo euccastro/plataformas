@@ -255,13 +255,18 @@
   (set! fondo-1 (freeze (cuadricula-filas 0 (cuadricula-columnas 0 fondo-0))))
   (set! ancho-pj-i (image-width (rectangle l-cadrado (* l-cadrado 2) "solid" "black")))
   (set! alto-pj-i (image-height (rectangle l-cadrado (* l-cadrado 2) "solid" "black")))
-  (set! empty-s (freeze (escalar (* ancho-fondo 1.2) alto-fondo (bitmap "fondo-c3.jpg"))))
-  (set! cadrado-s (rectangle (+ l-cadrado 1) (+ l-cadrado 1) "solid" (make-color 50 50 50)))
+  (set! empty-s 
+        (cond
+          ((file-exists? "fondo-c3.jpg")
+           (freeze (escalar (* ancho-fondo 1.2) alto-fondo (bitmap "fondo-c3.jpg"))))
+          (else
+           (freeze (rectangle ancho-fondo alto-fondo "solid" "white")))))
+  (set! cadrado-s (freeze (rectangle (+ l-cadrado 1) (+ l-cadrado 1) "solid" (make-color 50 50 50))))
   (set! cadrado-s-2 (freeze 
                      (overlay
                       (circle (/ l-cadrado 4) "solid" "darkblue")
                       (rectangle (+ l-cadrado 1) (+ l-cadrado 1) "solid" "lightblue"))))
-  (set! cadrado-fin (rectangle (+ l-cadrado 1) (+ l-cadrado 1) "solid" "lightgreen"))
+  (set! cadrado-fin (freeze (rectangle (+ l-cadrado 1) (+ l-cadrado 1) "solid" "lightgreen")))
   (set! linea-alto (freeze (line 0 alto-fondo "lightgray")))
   (set! linea-ancho (freeze (line ancho-fondo-real 0 "lightgray")))
   (set! cadro-r (freeze
@@ -271,13 +276,15 @@
   (set! movemento-lateral (/ l-cadrado 4))
   (set! movemento-salto (/ l-cadrado 4))
   (set! rectangulo-pj-normal
-        (overlay
-         (rectangle l-cadrado (* l-cadrado 2) "outline" "darkred")
-         (rectangle l-cadrado (* l-cadrado 2) "solid" "black")))
+        (freeze
+         (overlay
+          (rectangle (- l-cadrado 1) (* l-cadrado 2) "outline" "darkred")
+          (rectangle (- l-cadrado 1) (* l-cadrado 2) "solid" "black"))))
   (set! rectangulo-pj-agachado
-        (overlay
-         (rectangle l-cadrado l-cadrado "outline" "darkred")
-         (rectangle l-cadrado l-cadrado "solid" "black")))
+        (freeze
+         (overlay
+          (rectangle (- l-cadrado 1) l-cadrado "outline" "darkred")
+          (rectangle (- l-cadrado 1) l-cadrado "solid" "black"))))
   (set! fondo-estatico
         (freeze  (por-cadros #t cadrado-s-2 lista-puntos-creados 
                              (pantalla-con-cadros cadrado-s lista-puntos
@@ -548,14 +555,14 @@
 (define rectangulo-pj-normal
   (freeze
    (overlay
-   (rectangle (- l-cadrado 1) (* l-cadrado 2) "outline" "darkred")
-   (rectangle l-cadrado (* l-cadrado 2) "solid" "black"))))
+    (rectangle (- l-cadrado 1) (* l-cadrado 2) "outline" "darkred")
+    (rectangle l-cadrado (* l-cadrado 2) "solid" "black"))))
 
 (define rectangulo-pj-agachado
   (freeze
-  (overlay
-   (rectangle (- l-cadrado 1) l-cadrado "outline" "darkred")
-   (freeze (rectangle l-cadrado l-cadrado "solid" "black")))))
+   (overlay
+    (rectangle (- l-cadrado 1) l-cadrado "outline" "darkred")
+    (freeze (rectangle l-cadrado l-cadrado "solid" "black")))))
 
 (define (img-pj x)
   (define estado-m (pj-estado-m (xogo-pj x)))
@@ -748,14 +755,14 @@
 
 ;imagenes cadrados
 
-(define cadrado-s (rectangle (+ l-cadrado 1) (+ l-cadrado 1) "solid" (make-color 50 50 50)))
+(define cadrado-s (freeze (rectangle (+ l-cadrado 1) (+ l-cadrado 1) "solid" (make-color 50 50 50))))
 
 (define cadrado-s-2 (freeze 
                      (overlay
                       (circle (/ l-cadrado 4) "solid" "darkblue")
                       (rectangle (+ l-cadrado 1) (+ l-cadrado 1) "solid" "lightblue"))))
 
-(define cadrado-fin (rectangle (+ l-cadrado 1) (+ l-cadrado 1) "solid" "lightgreen"))
+(define cadrado-fin (freeze (rectangle (+ l-cadrado 1) (+ l-cadrado 1) "solid" "lightgreen")))
 
 (define cadro-r (freeze
                  (overlay
@@ -937,48 +944,48 @@
                       (else 
                        ""))
                     (floor (/ ancho-fondo 15)) (cond
-                                              ((equal? (xogo-estado x) "game over")
-                                               "red")
-                                              ((equal? (xogo-estado x) "completado")
-                                               "green")
-                                              (else "black")))
+                                                 ((equal? (xogo-estado x) "game over")
+                                                  "red")
+                                                 ((equal? (xogo-estado x) "completado")
+                                                  "green")
+                                                 (else "black")))
               (por-cadros-e ; pantalla do xogo en sí
                (if (xogo-cuadricula x) #t #f)
                x cadro-r lista-pasable
-                            (place-image (img-pj x)
-                                         (punto-x (pj-punto-pantalla (xogo-pj x)))
-                                         (cond
-                                           ((and
-                                             (member #\s estado-m)
-                                             (equal? estado-s "floor"))
-                                            (+ (punto-y (pj-punto (xogo-pj x))) (/ l-cadrado 2)))
-                                           (else
-                                            (punto-y (pj-punto (xogo-pj x)))))      
-                                         (place-image
-                                          (if (xogo-cuadricula x) fondo-estatico-cuadricula fondo-estatico)
-                                          (cond 
-                                            ((<= punto-pj-x (/ ancho-fondo 2))
-                                             (+ (/ ancho-fondo 2) (/ (- ancho-fondo-real ancho-fondo) 2)))
-                                            ((>= punto-pj-x (- ancho-fondo-real (/ ancho-fondo 2)))
-                                             (- (/ ancho-fondo 2) (/ (- ancho-fondo-real ancho-fondo) 2)))
+               (place-image (img-pj x)
+                            (punto-x (pj-punto-pantalla (xogo-pj x)))
+                            (cond
+                              ((and
+                                (member #\s estado-m)
+                                (equal? estado-s "floor"))
+                               (+ (punto-y (pj-punto (xogo-pj x))) (/ l-cadrado 2)))
+                              (else
+                               (punto-y (pj-punto (xogo-pj x)))))      
+                            (place-image
+                             (if (xogo-cuadricula x) fondo-estatico-cuadricula fondo-estatico)
+                             (cond 
+                               ((<= punto-pj-x (/ ancho-fondo 2))
+                                (+ (/ ancho-fondo 2) (/ (- ancho-fondo-real ancho-fondo) 2)))
+                               ((>= punto-pj-x (- ancho-fondo-real (/ ancho-fondo 2)))
+                                (- (/ ancho-fondo 2) (/ (- ancho-fondo-real ancho-fondo) 2)))
+                               (else
+                                (- (+ (/ ancho-fondo 2) (/ (- ancho-fondo-real ancho-fondo) 2)) 
+                                   (- (punto-x (pj-punto (xogo-pj x)))
+                                      (punto-x (pj-punto-pantalla (xogo-pj x)))))
+                                ))
+                             (/ alto-fondo 2) 
+                             (place-image empty-s
+                                          (cond
+                                            ((> punto-pj-x (- ancho-fondo-real (/ ancho-fondo 2)))
+                                             (- (/ ancho-fondo 2)
+                                                (/ (- (- ancho-fondo-real (/ ancho-fondo 2)) (/ ancho-fondo 2)) 30)))
+                                            ((> punto-pj-x (/ ancho-fondo 2))
+                                             (- (/ ancho-fondo 2)
+                                                (/ (- punto-pj-x (/ ancho-fondo 2)) 30)))
                                             (else
-                                             (- (+ (/ ancho-fondo 2) (/ (- ancho-fondo-real ancho-fondo) 2)) 
-                                                (- (punto-x (pj-punto (xogo-pj x)))
-                                                   (punto-x (pj-punto-pantalla (xogo-pj x)))))
-                                             ))
-                                          (/ alto-fondo 2) 
-                                          (place-image empty-s
-                                                       (cond
-                                                         ((> punto-pj-x (- ancho-fondo-real (/ ancho-fondo 2)))
-                                                          (- (/ ancho-fondo 2)
-                                                             (/ (- (- ancho-fondo-real (/ ancho-fondo 2)) (/ ancho-fondo 2)) 30)))
-                                                         ((> punto-pj-x (/ ancho-fondo 2))
-                                                          (- (/ ancho-fondo 2)
-                                                             (/ (- punto-pj-x (/ ancho-fondo 2)) 30)))
-                                                         (else
-                                                          (/ ancho-fondo 2)))
-                                                       (/ alto-fondo 2)
-                                                       (empty-scene ancho-fondo alto-fondo)))))))))
+                                             (/ ancho-fondo 2)))
+                                          (/ alto-fondo 2)
+                                          (empty-scene ancho-fondo alto-fondo)))))))))
 
 ; funcíon para escalar unha imagen
 
@@ -987,7 +994,12 @@
 
 ;(define empty-s (freeze (empty-scene ancho-fondo alto-fondo (make-color 230 230 230))))
 
-(define empty-s (freeze (escalar (* ancho-fondo 1.2) alto-fondo (bitmap "fondo-c3.jpg"))))
+(define empty-s 
+  (cond
+    ((file-exists? "fondo-c3.jpg")
+     (freeze (escalar (* ancho-fondo 1.2) alto-fondo (bitmap "fondo-c3.jpg"))))
+    (else
+     (freeze (rectangle ancho-fondo alto-fondo "solid" "lightgray")))))
 
 ;; on-key ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1036,7 +1048,7 @@
                 1)
             #t)
            (equal? estado-s "floor"))
-          (play-sound "salto.wav" #t)
+          (when (file-exists? "salto.wav") (play-sound "salto.wav" #t))
           "up")
          (else 
           estado-s))
