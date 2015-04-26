@@ -4,7 +4,7 @@
 
 (define l-cadrado 15)
 
-;;COMENTARIO
+;; Defino git como 1
 (define git 1)
 
 (define l-cadrado-a l-cadrado)
