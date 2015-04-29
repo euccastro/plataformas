@@ -9,15 +9,15 @@
 
 ;CONSTANTES XOGO
 
-(define l-cadrado 12)
+(define l-cadrado 10)
 
 (define l-cadrado-a l-cadrado)
 
-(define n-c-ancho-ventana 50)
+(define n-c-ancho-ventana 80)
 
 ;;relacion -> n-c-alto-ventana = (/ n-c-ancho 2)
 
-(define n-c-alto-ventana 25)
+(define n-c-alto-ventana 40)
 
 (define ancho-inicial (* l-cadrado n-c-ancho-ventana))
 
@@ -279,7 +279,6 @@
   (set! ancho-fondo-ventana (* l-cadrado n-c-ancho-ventana))
   (set! alto-fondo-ventana (* l-cadrado n-c-alto-ventana))
   (set! fondo-0 (freeze (empty-scene ancho-fondo alto-fondo transparente)))
-  (set! fondo-1 (freeze (cuadricula-filas 0 (cuadricula-columnas 0 fondo-0))))
   (set! ancho-pj-i (image-width (rectangle l-cadrado (* l-cadrado 2) "solid" "black")))
   (set! alto-pj-i (image-height (rectangle l-cadrado (* l-cadrado 2) "solid" "black")))
   (set! empty-s 
@@ -314,10 +313,7 @@
          (overlay
           (rectangle (- l-cadrado 1) l-cadrado "outline" "darkred")
           (rectangle (- l-cadrado 1) l-cadrado "solid" "black"))))
-  (set! fondo-estatico
-        (freeze  (por-cadros #t cadrado-s-2 lista-puntos-creados 
-                             (pantalla-con-cadros cadrado-s lista-puntos
-                                                  (pantalla-con-cadros cadrado-fin lista-puntos-ganar fondo-0)))))
+  (set! fondo-estatico (escalar ancho-fondo alto-fondo fondo-estatico))
   (set! fondo-estatico-cuadricula
         (freeze (por-cuadricula #t fondo-estatico)))
   (set! cambiando-tamaño #t)
@@ -558,11 +554,7 @@
                        (cuadricula-columnas 0 fondo)))
     (else fondo)))
 
-; fondo con cuadricula
-
-(define fondo-1 (cuadricula-filas 0 (cuadricula-columnas 0 fondo-0)))
-
-;;;;
+;;;
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;PUNTOS ORDENADOS ;;;;;;;;;;;
@@ -805,9 +797,8 @@
 
 (struct pj (estado-m estado-s punto punto-pantalla) #:transparent)
 
-(struct xogo (pj temp vel-c cuadricula cadros-restantes estado carga conm) #:transparent)
+(struct xogo (pj temp vel-c cuadricula cadros-restantes estado carga conm p-mouse) #:transparent)
 
-;; 
 
 ;; to-draw ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -960,6 +951,33 @@
                                             (/ ancho-fondo-ventana 2) 
                                             (- alto-fondo-ventana (/ (/ alto-fondo-ventana 7) 2))
                                             (empty-scene ancho-fondo-ventana alto-fondo-ventana)))))))))))
+; pantalla edición
+
+(define (pantalla-edicion x)
+  (define punto-pj-x (punto-x (pj-punto (xogo-pj x))))
+  (define punto-pj-y (punto-y (pj-punto (xogo-pj x))))
+  (place-image
+   (if (xogo-cuadricula x) fondo-estatico-cuadricula fondo-estatico)
+   (cond
+     ((<= punto-pj-x (/ ancho-fondo-ventana 2))
+      (+ (/ ancho-fondo-ventana 2) (/ (- ancho-fondo ancho-fondo-ventana) 2)))
+     ((>= punto-pj-x (- ancho-fondo (/ ancho-fondo-ventana 2)))
+      (- (/ ancho-fondo-ventana 2) (/ (- ancho-fondo ancho-fondo-ventana) 2)))
+     (else
+      (- (+ (/ ancho-fondo-ventana 2) (/ (- ancho-fondo ancho-fondo-ventana) 2)) 
+         (- (punto-x (pj-punto (xogo-pj x)))
+            (punto-x (pj-punto-pantalla (xogo-pj x)))))))
+   (cond 
+     ((<= punto-pj-y (/ alto-fondo-ventana 2))
+      (+ (/ alto-fondo-ventana 2) (/ (- alto-fondo alto-fondo-ventana) 2)))
+     ((>= punto-pj-y (- alto-fondo (/ alto-fondo-ventana 2)))
+      (- (/ alto-fondo-ventana 2) (/ (- alto-fondo alto-fondo-ventana) 2)))
+     (else
+      (- (+ (/ alto-fondo-ventana 2) (/ (- alto-fondo alto-fondo-ventana) 2)) 
+         (- (punto-y (pj-punto (xogo-pj x)))
+            (punto-y (pj-punto-pantalla (xogo-pj x)))))
+      ))
+   (empty-scene ancho-fondo-ventana alto-fondo-ventana "white")))
 
 ; pantalla do xogo (incluindo a inicial)
 
@@ -967,6 +985,8 @@
   (cond
     ((member (xogo-estado x) (list "inicio" "xogo->pantallas" "cargando"))
      (pantalla-inicio x)) ; pantalla-inicial
+    ((equal? (xogo-estado x) "edicion")
+     (pantalla-edicion x)) ;;pantalla-edición
     (else
      (define estado-m (pj-estado-m (xogo-pj x)))
      (define estado-s (pj-estado-s (xogo-pj x)))
@@ -1059,6 +1079,11 @@
 
 ;; on-key ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define punto-pj-c #f)
+(define punto-pj-pantalla-c #f)
+(define punto-y-comeza-salto #f)
+(define l-cadrado-edi 0)
+
 ;; PRESIONAR 
 
 (define (tecla x t)
@@ -1082,8 +1107,10 @@
      (define punto-pj-y (punto-y (pj-punto (xogo-pj x))))
      (define estado-m (pj-estado-m (xogo-pj x)))
      (define estado-s (pj-estado-s (xogo-pj x)))
-     ;(when (equal? t #\return) (display (puntos->texto lista-puntos-creados)))
-     (when (member t tecla-agacharse) (set! agacharse #t))
+     (when (equal? t #\return) (display (puntos->texto lista-puntos-creados)))
+     (when (and (member t tecla-agacharse)
+                (not (equal? (xogo-estado x) "edicion")))
+       (set! agacharse #t))
      (xogo
       (pj
        (cond ;;movemento-m
@@ -1096,6 +1123,7 @@
           estado-m))
        (cond ;;movemento-s
          ((and
+           (not (equal? (xogo-estado x) "edicion"))
            (not (elemento-en-lista? #\s estado-m))
            (member t tecla-salto)
            (if 
@@ -1104,12 +1132,45 @@
                 1)
             #t)
            (equal? estado-s "floor"))
-          ;(when (file-exists? "salto.wav") (play-sound "salto.wav" #t))
+          (when (file-exists? "salto.wav") (play-sound "salto.wav" #t))
           "up")
          (else 
           estado-s))
-       (pj-punto (xogo-pj x))   ;; punto-pj)
-       (pj-punto-pantalla (xogo-pj x))) ;;punto-pantalla
+       (cond ;; punto-pj
+         ((and
+           (equal? t #\v)
+           (not (equal? (xogo-estado x) "edicion")))
+         (punto
+         (cond
+           ((< punto-pj-x (/ ancho-fondo-ventana 2))
+            (/ ancho-fondo-ventana 2))
+           ((> punto-pj-x (- ancho-fondo (/ ancho-fondo-ventana 2)))
+            (- ancho-fondo (/ ancho-fondo-ventana 2)))
+           (else
+            punto-pj-x))
+         (cond
+           ((< punto-pj-y (/ alto-fondo-ventana 2))
+            (/ alto-fondo-ventana 2))
+           ((> punto-pj-y (- alto-fondo (/ alto-fondo-ventana 2)))
+            (- alto-fondo (/ alto-fondo-ventana 2)))
+           (else
+            punto-pj-y))))
+         ((and
+           (equal? t #\v)
+           (equal? (xogo-estado x) "edicion"))
+          (punto 
+           (* (/ (punto-x punto-pj-c) l-cadrado-edi) l-cadrado)
+           (* (/ (punto-y punto-pj-c) l-cadrado-edi) l-cadrado)))
+         (else
+          (pj-punto (xogo-pj x))))
+       (cond ;;punto-pantalla
+         ((and
+           (equal? t #\v)
+           (equal? (xogo-estado x) "edicion"))
+          punto-pj-pantalla-c)
+         (else
+          (pj-punto-pantalla (xogo-pj x))))
+       )
       (cond ;;temp
         ((and
           (not (elemento-en-lista? #\s estado-m))
@@ -1131,9 +1192,29 @@
         (else
          (xogo-cuadricula x)))
       (xogo-cadros-restantes x)
-      (xogo-estado x)
+      (cond
+        ((and
+          (equal? t #\v)
+          (equal? (xogo-estado x) "pantallas"))
+         (set! punto-pj-c (pj-punto (xogo-pj x)))
+         (set! punto-pj-pantalla-c (pj-punto-pantalla (xogo-pj x)))
+         (set! l-cadrado-edi l-cadrado)
+         "edicion")
+        ((and
+          (equal? t #\v)
+          (equal? (xogo-estado x) "edicion"))
+         "pantallas")
+        (else
+         (xogo-estado x)))
       (xogo-carga x)
-      (xogo-conm x)))))
+      (xogo-conm x)
+      (cond ; p-mouse
+        ((and
+          (equal? t #\v)
+          (equal? (xogo-estado x) "pantallas"))
+         (pj-punto (xogo-pj x)))
+        (else
+         (xogo-p-mouse x)))))))
 
 ;; on-release ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1175,7 +1256,8 @@
       (xogo-cadros-restantes x)
       (xogo-estado x)
       (xogo-carga x)
-      (xogo-conm x)))))
+      (xogo-conm x)
+      (xogo-p-mouse x)))))
 
 ;; on-tick ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1215,7 +1297,73 @@
          (- (xogo-conm x) 1))
         (else
          (xogo-conm x)))
+      (xogo-p-mouse x)
       ))
+    ((equal? (xogo-estado x) "edicion")
+     (define punto-pj-x (punto-x (pj-punto (xogo-pj x))))
+     (define punto-pj-y (punto-y (pj-punto (xogo-pj x))))
+     (struct-copy xogo x
+                  [pj 
+                   [struct-copy pj (xogo-pj x)
+                                [punto
+                                 (punto
+                                 (cond
+                                   ((and
+                                     (> (punto-x (xogo-p-mouse x)) (+ (/ ancho-fondo-ventana 2) (/ ancho-fondo-ventana 8)))
+                                     (< punto-pj-x (- ancho-fondo (/ ancho-fondo-ventana 2))))
+                                    (+ punto-pj-x (/ (punto-x (xogo-p-mouse x)) 50)))
+                                   ((and
+                                     (< (punto-x (xogo-p-mouse x)) (- (/ ancho-fondo-ventana 2) (/ ancho-fondo-ventana 8)))
+                                     (> punto-pj-x (/ ancho-fondo-ventana 2)))
+                                    (- punto-pj-x (/ (- ancho-fondo-ventana (punto-x (xogo-p-mouse x))) 50)))
+                                   (else
+                                    punto-pj-x))
+                                 (cond
+                                   ((and
+                                     (> (punto-y (xogo-p-mouse x)) (+ (/ alto-fondo-ventana 2) (/ alto-fondo-ventana 10)))
+                                     (< punto-pj-y (- alto-fondo (/ alto-fondo-ventana 2))))
+                                    (+ punto-pj-y (/ (punto-y (xogo-p-mouse x)) 50)))
+                                   ((and
+                                     (< (punto-y (xogo-p-mouse x)) (- (/ alto-fondo-ventana 2) (/ alto-fondo-ventana 10)))
+                                     (> punto-pj-y (/ alto-fondo-ventana 2)))
+                                    (- punto-pj-y (/ (- alto-fondo-ventana (punto-y (xogo-p-mouse x))) 50)))
+                                   (else
+                                    punto-pj-y)))]
+                                [punto-pantalla
+                                 (punto
+                                  (cond
+                                    ((<= punto-pj-x (/ ancho-fondo-ventana 2))
+                                     (if cambiando-tamaño 
+                                         (* (/ punto-pj-x l-cadrado-a) l-cadrado)
+                                         punto-pj-x))
+                                    ((>= punto-pj-x (- ancho-fondo (/ ancho-fondo-ventana 2)))
+                                     (- (if cambiando-tamaño
+                                            (* (/ punto-pj-x l-cadrado-a) l-cadrado)
+                                            punto-pj-x)
+                                        (- ancho-fondo ancho-fondo-ventana)))
+                                    (else
+                                     (/ ancho-fondo-ventana 2)))
+                                  (cond
+                                    ((<= punto-pj-y (/ alto-fondo-ventana 2))
+                                     (if cambiando-tamaño 
+                                         (* (/ punto-pj-y l-cadrado-a) l-cadrado)
+                                         punto-pj-y))
+                                    ((>= punto-pj-y (- alto-fondo (/ alto-fondo-ventana 2)))
+                                     (- (if cambiando-tamaño
+                                            (* (/ punto-pj-y l-cadrado-a) l-cadrado)
+                                            punto-pj-y)
+                                        (- alto-fondo alto-fondo-ventana)))
+                                    (else
+                                     (/ alto-fondo-ventana 2))))]]]
+                  [conm 
+                   (cond
+                     (cambiando-tamaño
+                      (set! cambiando-tamaño #f)
+                      3)
+                     ((> (xogo-conm x) 0)
+                      (- (xogo-conm x) 1))
+                     (else
+                      (xogo-conm x)))]))
     ((member (xogo-estado x) (list "inicio" "xogo->pantallas"))
      (struct-copy xogo x [conm (cond
                                  (cambiando-tamaño
@@ -1294,6 +1442,12 @@
               distancia-bloque-esquerda-c
               (< distancia-bloque-esquerda-c 0))
              estado-s)
+            ((and
+              distancia-bloque-abaixo-c
+              (and
+               (< distancia-bloque-abaixo-c 1)
+               (> distancia-bloque-abaixo-c -1)))
+             "floor")
             (else
              "down")))
          (else
@@ -1380,6 +1534,11 @@
             (< distancia-bloque-esquerda-c 0))
            (- punto-pj-y (+ movemento-salto (round (/ (xogo-temp x) 2)))))
           ((and
+            (equal? estado-s "down")
+            distancia-bloque-abaixo-c
+            (<= distancia-bloque-abaixo-c (+ (xogo-vel-c x) 3)))
+           (+ punto-pj-y distancia-bloque-abaixo-c))
+          ((and
             (not (empty? estado-m))
             (equal? (car estado-m) #\d)
             distancia-bloque-abaixo-c
@@ -1397,11 +1556,6 @@
             distancia-bloque-esquerda-c
             (< distancia-bloque-esquerda-c 0))
            punto-pj-y) ;;para quitar meneo
-          ((and
-            (equal? estado-s "down")
-            distancia-bloque-abaixo-c
-            (<= distancia-bloque-abaixo-c (+ (xogo-vel-c x) 1)))
-           (+ punto-pj-y distancia-bloque-abaixo-c))
           ((and
             (or 
              (not distancia-bloque-abaixo-c)
@@ -1532,7 +1686,8 @@
         ((> (xogo-conm x) 0)
          (- (xogo-conm x) 1))
         (else
-         (xogo-conm x)))))))
+         (xogo-conm x)))
+      (xogo-p-mouse x)))))
 
 ;; stop-when
 
@@ -1607,7 +1762,8 @@
          (xogo-cadros-restantes x)
          "xogo->pantallas"
          (xogo-carga x)
-         (xogo-conm x)))
+         (xogo-conm x)
+         (xogo-p-mouse x)))
        (else
         x)))
     ((member (xogo-estado x) (list "game over" "completado"))
@@ -1645,9 +1801,7 @@
                                                (* (floor (/ py-v l-cadrado)) n-c-ancho)))
                             VECTOR-PUNTOS-ORDENADOS))
         (set! fondo-estatico
-              (freeze  (por-cadros #t cadrado-s-2 lista-puntos-creados 
-                                   (pantalla-con-cadros cadrado-s lista-puntos
-                                                        (pantalla-con-cadros cadrado-fin lista-puntos-ganar fondo-0)))))
+              (freeze  (por-cadros #t cadrado-s-2 (list (punto->punto-cadro (punto px-v py-v))) fondo-estatico))) 
         (set! fondo-estatico-cuadricula
               (freeze (por-cuadricula #t fondo-estatico)))
         (xogo
@@ -1658,7 +1812,8 @@
          (- (xogo-cadros-restantes x) 1)
          (xogo-estado x)
          (xogo-carga x)
-         (xogo-conm x)))
+         (xogo-conm x)
+         (xogo-p-mouse x)))
        (else
         x)))))
 
@@ -1672,7 +1827,7 @@
        empty "floor"
        punto-inicial
        punto-inicial)
-      0 0 #f 100 "pantallas" 100 0))
+      0 0 #f 100 "pantallas" 100 0 #f))
     (else
      (xogo
       (xogo-pj x)       
@@ -1690,7 +1845,8 @@
         (else
          (xogo-estado x)))
       (xogo-carga x)
-      (xogo-conm x)))))
+      (xogo-conm x)
+      (xogo-p-mouse x)))))
 
 
 ;; RODA DO RATÓN CARA ADIANTE
@@ -1700,7 +1856,7 @@
 (define (roda-adiante x)
   (cond
     ((and
-      ;(< (xogo-conm x) 3)
+      (< (xogo-conm x) 3)
       (> n-c-ancho-ventana 40)
       (not (member (xogo-estado x) (list "inicio" "cargando" "xogo->pantallas")))
       )
@@ -1719,7 +1875,7 @@
 (define (roda-atras x)
   (cond
     ((and
-      ;(< (xogo-conm x) 3)
+      (< (xogo-conm x) 3)
       (< n-c-ancho-ventana n-c-ancho)
       (< n-c-alto-ventana n-c-alto)
       (not (member (xogo-estado x) (list "inicio" "cargando" "xogo->pantallas")))
@@ -1748,9 +1904,12 @@
 
 ;; MOVEMENTO DO RATÓN
 
-#;(define (mover-mouse x px py)
-  (struct-copy xogo x [pj
-                       (struct-copy pj (xogo-pj x) [punto (punto px py)])]))
+(define (mover-mouse x px py)
+  (cond
+    ((equal? (xogo-estado x) "edicion")
+     (struct-copy xogo x [p-mouse (punto px py)]))
+    (else
+     x)))
 
 ;;BIG-BONG ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -1761,7 +1920,7 @@
             empty "floor"
             punto-inicial
             punto-inicial)
-           0 0 #f 500 "cargando" 100 0)
+           0 0 #f 500 "cargando" 100 0 #f)
           'on-draw pantalla-xogo
           'on-key-press tecla
           'on-key-release soltar-tecla
