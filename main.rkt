@@ -1,15 +1,23 @@
 #lang racket
 
-;Modulos importados
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;; XOGO            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;Módulos importados
 
 (require (except-in racket/gui make-color make-pen))
 (require 2htdp/image)
-(require (only-in mrlib/image-core render-image))
 (require racket/vector)
 
-;CONSTANTES XOGO
+(require "structs.rkt")
+(require "funcions-varias.rkt")
+(require "distancias.rkt")
+(require "big-bong.rkt")
 
-(define l-cadrado 10)
+;;;;CONSTANTES XOGO ::::::::::::::::
+
+(define l-cadrado 8)
 
 (define l-cadrado-a l-cadrado)
 
@@ -25,152 +33,9 @@
 
 (define cambiando-tamaño #f)
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;; MODULO BIG-BONG ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define ancho-frame #f)
-(define alto-frame #f)
-
-(define (pairs l)
-  (cond ((null? l) '())
-        ((null? (cdr l)) (list l))
-        (else
-         (cons (list (car l) (cadr l))
-               (pairs (cddr l))))))
-
-(define (parse-handlers handlers)
-  (define h (make-hasheq '((on-draw . #f)
-                           (on-key-press . #f)
-                           (on-key-release . #f)
-                           (on-mouse-press . #f)
-                           (on-mouse-release . #f)
-                           (on-mouse-move . #f)
-                           (on-wheel-down . #f)
-                           (on-wheel-up . #f)
-                           (on-tick . #f)
-                           (tick-interval . #f)
-                           (stop-when . #f))))
-  (define not-found (list))
-  (for ((pair (pairs handlers)))
-    (let ((existing (hash-ref h (car pair) not-found)))
-      (cond ((eq? existing not-found)
-             (error "nom existe esse evento:" (car pair)))
-            (existing
-             (error "ja havia um manejador para esse evento:" (car pair)))
-            (else
-             (hash-set! h (car pair) (cadr pair))))))
-  h)
-
-(define (big-bong state . rest)
-  (define handlers (parse-handlers rest))
-  (define on-draw (hash-ref handlers 'on-draw))
-  (when (not on-draw)
-    (error "E necessario um manejador de on-draw!"))
-  (define frame
-    (let* ((image (on-draw state))
-           (initial-width (image-width image))
-           (initial-height (image-height image)))
-      (new frame%
-           (label "Mundo de Cadrados")
-           (width initial-width)
-           (height initial-height)
-           (min-width ancho-inicial)
-           (min-height alto-inicial)
-           )))
-  (define tela%
-    (let ((pulsadas (mutable-seteq)))
-      (class canvas%
-        (field [rematou #f])
-        (define/override (on-event event)
-          (unless (get-field rematou this)
-            (case (send event get-event-type)
-              ((left-down) (handle-user-event 'on-mouse-press (send event get-x) (send event get-y) 'left))
-              ((left-up) (handle-user-event 'on-mouse-release (send event get-x) (send event get-y) 'left))
-              ((middle-down) (handle-user-event 'on-mouse-press (send event get-x) (send event get-y) 'middle))
-              ((middle-up) (handle-user-event 'on-mouse-release (send event get-x) (send event get-y) 'middle))
-              ((right-down) (handle-user-event 'on-mouse-press (send event get-x) (send event get-y) 'right))
-              ((right-up) (handle-user-event 'on-mouse-release (send event get-x) (send event get-y) 'right))
-              ((motion) (handle-user-event 'on-mouse-move (send event get-x) (send event get-y))))))
-        (define/public (handle-user-event name . rest)
-          (let ((h (hash-ref handlers name)))
-            (when h
-              (let ((estado-novo (apply h state rest)))
-                (when (not (equal? estado-novo state))
-                  (set! state estado-novo)
-                  (let ((stop-when (hash-ref handlers 'stop-when)))
-                    (when (and stop-when (stop-when state))
-                      (set-field! rematou this #t)))
-                  (send this refresh))))))
-        (define/override (on-char event)
-          (unless (get-field rematou this)
-            (let ((pulsando (send event get-key-code)))
-              (case pulsando
-                ((release) (let ((soltando (send event get-key-release-code)))
-                             (set-remove! pulsadas soltando)
-                             (handle-user-event 'on-key-release soltando)))
-                ((wheel-down) (handle-user-event 'on-wheel-down))
-                ((wheel-up) (handle-user-event 'on-wheel-up))
-                (else
-                 (unless (set-member? pulsadas pulsando)
-                   (set-add! pulsadas pulsando)
-                   (handle-user-event 'on-key-press pulsando)))))))
-        (super-new))))
-  (define tela
-    (new tela% (parent frame)
-         (style '(no-autoclear))
-         (paint-callback
-          (λ (canvas dc)
-            (let* ((image (on-draw state))
-                   (width (image-width image))
-                   (height (image-height image)))
-              (when (or (not (= width (send tela get-width)))
-                        (not (= height (send tela get-height))))
-                ;(send frame resize width height)
-                ;(send frame on-size width height)
-                (set! ancho-frame (send frame get-width))
-                (set! alto-frame (send frame get-height))
-                ;(send frame min-width width)
-                ;(send frame min-height height)
-                )
-              (render-image
-               (on-draw state)
-               dc
-               0
-               0))))))
-  (let ((on-tick (hash-ref handlers 'on-tick)))
-    (when on-tick
-      (letrec ((timer (new timer%
-                           (notify-callback (λ ()
-                                              (if (and (send frame is-shown?) (not (get-field rematou tela)))
-                                                  (send tela handle-user-event 'on-tick)
-                                                  (send timer stop))))
-                           (interval (inexact->exact (floor (* 1000 (or (hash-ref handlers 'tick-interval)
-                                                                        1/30))))))))
-        #f)))
-  (send frame show #t)
-  (send tela focus))
-
-(define (di . args)
-  (cond ((null? args)
-         (newline)
-         (flush-output))
-        (else
-         (print (car args))
-         (display " ")
-         (apply di (cdr args)))))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;; XOGO            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;; CONSTANTES ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define movemento-lateral (/ l-cadrado 4))
+(define movemento-lateral (/ l-cadrado 3.5))
 
 (define movemento-salto (/ l-cadrado 4))
-
-;;;
 
 (define ancho-fondo-ventana (* l-cadrado n-c-ancho-ventana))
 
@@ -194,7 +59,6 @@
 
 (define fondo-0 (freeze (empty-scene ancho-fondo alto-fondo transparente)))
 
-
 ;;teclas de movemento:
 
 (define tecla-salto '(#\w up #\space))
@@ -206,8 +70,6 @@
 (define tecla-esquerda '(#\a left))
 
 ;; LISTA PUNTOS ;;
-
-(struct punto-c (x y) #:transparent)
 
 ;; LISTA DE PUNTOS QUE SE REPRESENTAN POR DEFECTO
 
@@ -254,21 +116,11 @@
 
 (define lista-puntos-ganar (list (punto-c 48 16) (punto-c 47 16)))
 
-;; FUNCIÓNS VARIAS ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; VECTOR CREADO A PARTIR DOS PUNTOS :::
 
-;;Función para por un elemento en un vector en unha posición especifica
+(define VECTOR-PUNTOS-ORDENADOS (ordenar-punto-rev 0 0 lista-puntos empty n-c-alto n-c-ancho))
 
-(define (por-e-vector elemento posicion vector)
-  (cond
-    ((or
-      (>= posicion (vector-length vector))
-      (< posicion 0))
-     vector)
-    (else
-     (vector-append
-      (vector-take vector posicion)
-      (make-vector 1 elemento)
-      (vector-take-right vector (-  (vector-length vector) (+ posicion 1)))))))
+;; FUNCIÓN PARA REDEFINIR TAMAÑOS E VARIABLES ::::::::::::
 
 ;;Función para cando se modifica o tamaño ou zoom da ventana
 
@@ -283,10 +135,10 @@
   (set! alto-pj-i (image-height (rectangle l-cadrado (* l-cadrado 2) "solid" "black")))
   (set! empty-s 
         (cond
-          ((file-exists? "fondo-c3.jpg")
+          ((file-exists? "imaxes/fondo-c3.jpg")
            (freeze (escalar (+ (* ancho-fondo-ventana 1.2) (- n-c-ancho n-c-ancho-ventana))
                             (+ (* ancho-fondo-ventana 1.2) (- n-c-ancho n-c-ancho-ventana))
-                            (bitmap "fondo-c3.jpg"))))
+                            (bitmap "imaxes/fondo-c3.jpg"))))
           (else
            (freeze (rectangle (* ancho-fondo-ventana 1.2) (* alto-fondo-ventana 1.2) "solid" "white")))))
   (set! cadrado-s (freeze (rectangle (+ l-cadrado 1) (+ l-cadrado 1) "solid" (make-color 50 50 50))))
@@ -301,7 +153,7 @@
                  (overlay
                   (rectangle (* l-cadrado 0.75) (* l-cadrado 0.75) "outline" "red")
                   (rectangle l-cadrado l-cadrado "solid" transparente))))
-  (set! movemento-lateral (/ l-cadrado 4))
+  (set! movemento-lateral (/ l-cadrado 3.5))
   (set! movemento-salto (/ l-cadrado 4))
   (set! rectangulo-pj-normal
         (freeze
@@ -319,213 +171,15 @@
   (set! cambiando-tamaño #t)
   )
 
-;;convertir puntos en texto
-;lista
-
-(define (puntos->texto lista-puntos)
-  (cond 
-    ((empty? lista-puntos)
-     "")
-    (else
-     (string-append 
-      "(punto-c " (number->string (punto-c-x (car lista-puntos))) " " (number->string (punto-c-y (car lista-puntos))) ") "
-      (puntos->texto (cdr lista-puntos))))))
-
-;;voltear lista
-;lista + lista(empty) -> lista
-
-(define (voltear lista emp)
-  (cond
-    ((empty? lista)
-     emp)
-    (else
-     (voltear (cdr lista) (cons (car lista) emp)))))
-
-;;FUNCIÓNS PARA ACELERAR COLISIÓNS:
-;;COLLÉN DIRECTAMENTE OS PUNTOS ADECUADOS:
-
-;;ORDENA PUNTO A PUNTO
-; (punto 0 0) -> (punto 0 1) -> (punto 0 2)
-
-(define (ordenar-punto-rev px py lista-p lista)
-  (cond
-    ((>= py n-c-alto)
-     (list->vector (reverse lista)))
-    ((< px (- n-c-ancho 1))
-     (ordenar-punto-rev (+ px 1) py lista-p (cons
-                                             (filter (lambda (x)
-                                                       (and (= px (punto-c-x x))
-                                                            (= py (punto-c-y x))))
-                                                     lista-p)
-                                             lista)))
-    (else
-     (ordenar-punto-rev 0 (+ py 1) lista-p (cons
-                                            (filter (lambda (x)
-                                                      (and (= px (punto-c-x x))
-                                                           (= py (punto-c-y x))))
-                                                    lista-p)
-                                            lista)))))
-
-(define VECTOR-PUNTOS-ORDENADOS (ordenar-punto-rev 0 0 lista-puntos empty))
-
-(define (s-vector-ref vector n)
-  (cond
-    ((or
-      (< n 0)
-      (>= n (vector-length vector)))
-     empty)
-    (else
-     (vector-ref vector (inexact->exact (round n))))))
-
-(define (calc-apart-vect pc-y pc-x)
-  (cond
-    ((or
-      (< pc-x 0)
-      (>= pc-x n-c-ancho))
-     -1)
-    (else
-     (+ (* pc-y n-c-ancho) pc-x))))
-
-(define (coller-puntos-en-caida x p-x p-y vect vel-caida sumando)
-  (cond
-    ((>= vel-caida l-cadrado)
-     (append
-      (append 
-       (s-vector-ref vect (calc-apart-vect (+ p-y sumando) p-x))
-       (if (not (<= p-x 0)) 
-           (s-vector-ref vect (calc-apart-vect (+ p-y sumando) (- p-x 1))) empty)
-       (if (< p-x n-c-ancho) 
-           (s-vector-ref vect (calc-apart-vect (+ p-y sumando) (+ p-x 1))) empty))
-      (coller-puntos-en-caida x p-x p-y vect (- vel-caida l-cadrado) (+ sumando 1))))
-    (else
-     empty)))
-
-
-(define (coller-puntos-circundantes x pc-x pc-y vector)
-  (append
-   (s-vector-ref vector (calc-apart-vect pc-y  pc-x)) ;;puntos donde esta o pj
-   (s-vector-ref vector (calc-apart-vect (- pc-y 1)  pc-x))
-   (s-vector-ref vector (calc-apart-vect (- pc-y 2)  pc-x)) ;; punto arriba
-   (s-vector-ref vector (calc-apart-vect (+ pc-y 1)  pc-x)) ;; punto abaixo
-   (s-vector-ref vector (calc-apart-vect (+ pc-y 2)  pc-x)) ;;punto abaixo x2
-   (if (not (<= pc-x 0))
-       (append
-        (s-vector-ref vector (calc-apart-vect pc-y  (- pc-x 1)))       ;;puntos anteriores en x
-        (s-vector-ref vector (calc-apart-vect (- pc-y 1)  (- pc-x 1)))
-        (s-vector-ref vector (calc-apart-vect (- pc-y 2)  (- pc-x 1)))
-        (s-vector-ref vector (calc-apart-vect (+ pc-y 1)  (- pc-x 1)))
-        (s-vector-ref vector (calc-apart-vect (+ pc-y 2)  (- pc-x 1))))
-       empty)
-   (if (not (>= pc-x n-c-ancho))
-       (append
-        (s-vector-ref vector (calc-apart-vect pc-y  (+ pc-x 1))) ;;puntos posteriores en x
-        (s-vector-ref vector (calc-apart-vect (- pc-y 1)  (+ pc-x 1)))
-        (s-vector-ref vector (calc-apart-vect (- pc-y 2)  (+ pc-x 1)))
-        (s-vector-ref vector (calc-apart-vect (+ pc-y 1)  (+ pc-x 1)))
-        (s-vector-ref vector (calc-apart-vect (+ pc-y 2)  (+ pc-x 1))))
-       empty)
-   (if (equal? (pj-estado-s (xogo-pj x)) "down")
-       (append 
-        (s-vector-ref vector (calc-apart-vect (+ pc-y 3) pc-x))
-        (if (not (<= pc-x 0)) 
-            (s-vector-ref vector (calc-apart-vect (+ pc-y 3) (- pc-x 1))) empty)
-        (if (< pc-x n-c-ancho) 
-            (s-vector-ref vector (calc-apart-vect (+ pc-y 3) (+ pc-x 1))) empty))
-       empty)
-   (coller-puntos-en-caida x pc-x pc-y vector (xogo-vel-c x) 3)
-   (if (equal? (pj-estado-s (xogo-pj x)) "up")
-       (append
-        (s-vector-ref vector (calc-apart-vect (- pc-y 3) pc-x))
-        (if (not (<= pc-x 0))
-            (s-vector-ref vector (calc-apart-vect (- pc-y 3) (- pc-x 1))) empty)
-        (if (< pc-x n-c-ancho)
-            (s-vector-ref vector (calc-apart-vect (- pc-y 3) (+ pc-x 1))) empty))
-       empty)
-   ))
-
-;;FUNCIÓNS PARA COLLER PASAR OS PUNTOS ADECUADOS DEPENDENDO DO PUNTO ACTUAL DO PJ.
-
-;;coller puntos adecuados en x
-
-(define (coller-puntos-adecuados-x P-O punto-c-x-pj)
-  (cond
-    ((< punto-c-x-pj -1)
-     empty)
-    ((< punto-c-x-pj 0)
-     (vector-ref P-O (inexact->exact (+ punto-c-x-pj 1))))
-    ((= punto-c-x-pj 0)
-     (append (vector-ref P-O (inexact->exact punto-c-x-pj)) (vector-ref P-O (inexact->exact (+ punto-c-x-pj 1)))))
-    ((= punto-c-x-pj (- (+ n-c-ancho-ventana n-c-ancho) 1))
-     (append (vector-ref P-O punto-c-x-pj) (vector-ref P-O (inexact->exact (- punto-c-x-pj 1)))))
-    ((= punto-c-x-pj (+ n-c-ancho-ventana n-c-ancho))
-     (vector-ref P-O (inexact->exact (- punto-c-x-pj 1))))
-    ((> punto-c-x-pj (+ n-c-ancho-ventana n-c-ancho))
-     empty)
-    (else
-     (append (vector-ref P-O (inexact->exact punto-c-x-pj))
-             (vector-ref P-O (inexact->exact (- punto-c-x-pj 1))) (vector-ref P-O (inexact->exact (+ punto-c-x-pj 1)))))))
-
-;;coller puntos adecuados en y
-
-(define (coller-puntos-adecuados-y P-O punto-c-y-pj)
-  (cond
-    ((< punto-c-y-pj -1)
-     empty)
-    ((= punto-c-y-pj -1)
-     (vector-ref P-O (inexact->exact (+ punto-c-y-pj 1))))
-    ((= punto-c-y-pj 0)
-     (append (vector-ref P-O (inexact->exact punto-c-y-pj)) (vector-ref P-O (inexact->exact (+ punto-c-y-pj 1)))))
-    ((= punto-c-y-pj  (- n-c-alto-ventana 1))
-     (append (vector-ref P-O (inexact->exact punto-c-y-pj)) (vector-ref P-O (inexact->exact (- punto-c-y-pj 1)))))
-    ((= punto-c-y-pj  n-c-alto-ventana)
-     (vector-ref P-O (inexact->exact (- punto-c-y-pj 1))))
-    ((> punto-c-y-pj n-c-alto-ventana)
-     empty)
-    (else
-     (append (vector-ref P-O (inexact->exact punto-c-y-pj)) 
-             (vector-ref P-O (inexact->exact (- punto-c-y-pj 1))) (vector-ref P-O (inexact->exact (+ punto-c-y-pj 1)))))))
-
-;; -----------------
-
-;elemento + lista -> booleano
-
-; (define (elemento-en-lista? e lista)
-;   (not (false? (member e lista))))
-(define (elemento-en-lista? e lista)
-  (cond
-    ((empty? lista) #f)
-    ((equal? e (car lista)) #t)
-    (else (elemento-en-lista? e (cdr lista)))))
-
-;; volve un número positivo
-
-(define (positivo n)
-  (cond
-    ((< n 0)
-     (- n))
-    (else n)))
-
-;elemento + lista -> lista
-;pon un elemento nunha lista
-
-(define (por-elemento-lista x e lista)
-  (define estado-s (pj-estado-s (xogo-pj x)))
-  (cond
-    ((empty? lista)
-     (cons e lista))
-    ((equal? e (car lista))
-     lista)
-    ((member (car lista) tecla-agacharse)
-     (cons e (remove #\s lista)))
-    (else
-     (cons (car lista) (list e)))))
+;; FUNCIÓNS PARA CREAR A CUADRICULA :::::
 
 ;; Creación da cuadricula
 
-;;número(0) + imagen -> imagen
-
 (define linea-alto (freeze (line 0 alto-fondo "lightgray")))
+
 (define linea-ancho (freeze (line ancho-fondo 0 "lightgray")))
+
+;;número(0) + imagen -> imagen
 
 (define (cuadricula-filas py fondo)
   (place-image
@@ -554,23 +208,7 @@
                        (cuadricula-columnas 0 fondo)))
     (else fondo)))
 
-;;;
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;;PUNTOS ORDENADOS ;;;;;;;;;;;
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;---- X ----
-
-;(define PUNTOS-ORDENADOS-X (ordenar-puntos-x 0 lista-puntos empty))
-
-;---- Y ----
-
-;(define PUNTOS-ORDENADOS-Y (ordenar-puntos-y 0 lista-puntos empty))
-
-;; PERSONAJE ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-; imagenes
+; IMAGENES :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define rectangulo-pj-normal
   (freeze
@@ -595,185 +233,13 @@
     (else
      rectangulo-pj-normal)))
 
-; ancho e alto
+; ancho e alto do personaje
 
 (define ancho-pj-i (image-width (rectangle l-cadrado (* l-cadrado 2) "solid" "black")))
 
 (define alto-pj-i (image-height (rectangle l-cadrado (* l-cadrado 2) "solid" "black")))
 
-(define (ancho-pj x) (image-width (img-pj x)))
-
-(define (alto-pj x) (image-height (img-pj x)))
-
 ;; CADROS (PLATAFORMAS) ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;punto-c -> punto
-
-(define (punto-cadro->punto p-c)
-  (punto
-   (+ (* (punto-c-x p-c) l-cadrado) (/ l-cadrado 2))
-   (+ (* (punto-c-y p-c) l-cadrado) (/ l-cadrado 2))))
-
-;;punto -> punto-c
-
-(define (punto->punto-cadro p)
-  (punto-c
-   (floor (/ (punto-x p) l-cadrado))
-   (floor (/ (punto-y p) l-cadrado))))
-
-;numero + punto -> punto
-
-(define (sumar-x-punto n punto-pj)
-  (punto
-   (+ (punto-x punto-pj) n)
-   (punto-y punto-pj)))
-
-(define (sumar-y-punto n punto-pj)
-  (cond
-    ((punto? punto-pj)
-     (punto
-      (punto-x punto-pj)
-      (+ (punto-y punto-pj) n)))
-    (else
-     (punto-c
-      (punto-c-x punto-pj)
-      (+ (punto-c-y punto-pj) n)))))
-
-;; distancia bloque de abaixo
-;punto-pj + lista-bloques + lista (empty) -> número
-
-(define (distancia-bloque-abaixo punto-pj lista lista-e)
-  (cond
-    ((empty? lista)
-     (cond
-       ((empty? lista-e)
-        #f)
-       (else
-        (- (- (punto-y (punto-cadro->punto (argmin punto-c-y lista-e))) (/ l-cadrado 2))
-           (+ (punto-y punto-pj) l-cadrado)))))
-    (else
-     (distancia-bloque-abaixo 
-      punto-pj empty
-      (filter (lambda (n) 
-                (and
-                 (or
-                  (= (punto-c-x (punto->punto-cadro punto-pj)) (punto-c-x n))
-                  (= (punto-c-x (punto->punto-cadro (sumar-x-punto (- 1 (/ l-cadrado 2)) punto-pj))) (punto-c-x n))
-                  (= (punto-c-x (punto->punto-cadro (sumar-x-punto (- (/ l-cadrado 2) 1) punto-pj))) (punto-c-x n)))
-                 (>= (- (- (punto-y (punto-cadro->punto n)) (/ l-cadrado 2)) 
-                        (+ (punto-y punto-pj) l-cadrado)) 
-                     (- (/ l-cadrado 2)))
-                 ))
-              lista)))))
-
-;; distancia bloque de arriba
-;punto-pj + lista-bloques + lista (empty) -> número
-
-(define (distancia-bloque-enriba x punto-pj lista lista-e)
-  (define estado-m (pj-estado-m (xogo-pj x)))
-  (define estado-s (pj-estado-s (xogo-pj x)))
-  (cond
-    ((empty? lista)
-     (cond
-       ((empty? lista-e)
-        #f)
-       (else
-        (- (if (and
-                (member #\s estado-m)
-                (equal? estado-s "floor"))
-               (punto-y punto-pj)
-               (- (punto-y punto-pj) l-cadrado))
-           (+ (punto-y (punto-cadro->punto (argmax punto-c-y lista-e))) (/ l-cadrado 2))))))
-    (else
-     (distancia-bloque-enriba
-      x punto-pj empty
-      (filter (lambda (n)
-                (and
-                 (or
-                  (= (punto-c-x (punto->punto-cadro punto-pj)) (punto-c-x n))
-                  (= (punto-c-x (punto->punto-cadro (sumar-x-punto (- 1 (/ l-cadrado 2)) punto-pj))) (punto-c-x n))
-                  (= (punto-c-x (punto->punto-cadro (sumar-x-punto (- (/ l-cadrado 2) 1) punto-pj))) (punto-c-x n)))
-                 (>= (- (if (and
-                             (member #\s estado-m)
-                             (equal? estado-s "floor"))
-                            (punto-y punto-pj)
-                            (- (punto-y punto-pj) l-cadrado))
-                        (- (punto-y (punto-cadro->punto n)) (/ l-cadrado 2))) 
-                     (- (/ l-cadrado 2)))
-                 ))
-              lista)))))
-
-
-;; distancia bloque da esquerda
-;punto-pj + lista-bloques + lista (empty) -> número
-
-(define (distancia-bloque-esquerda x punto-pj lista lista-e)
-  (define estado-m (pj-estado-m (xogo-pj x)))
-  (define estado-s (pj-estado-s (xogo-pj x)))
-  (cond
-    ((empty? lista)
-     (cond
-       ((empty? lista-e)
-        #f)
-       (else
-        (- (- (punto-x punto-pj) (/ l-cadrado 2))
-           (+ (punto-x (punto-cadro->punto (argmax punto-c-x lista-e))) (/ l-cadrado 2))))))
-    (else
-     (distancia-bloque-esquerda 
-      x punto-pj empty
-      (filter (lambda (n)
-                (and
-                 (or
-                  (= (punto-c-y (punto->punto-cadro punto-pj)) (punto-c-y n))
-                  (if (and
-                       (member #\s estado-m)
-                       (equal? estado-s "floor"))
-                      #f
-                      (= (punto-c-y (punto->punto-cadro (sumar-y-punto (- 1  l-cadrado) punto-pj))) (punto-c-y n)))
-                  (= (punto-c-y (punto->punto-cadro (sumar-y-punto (- l-cadrado 1) punto-pj))) (punto-c-y n)))
-                 (>=  (- (- (punto-x punto-pj) (/ l-cadrado 2))
-                         (- (punto-x (punto-cadro->punto n)) (/ l-cadrado 2))) 
-                      0)
-                 ))
-              lista
-              )))))
-
-
-;; distancia bloque da dereita
-;punto-pj + lista-bloques + lista (empty) -> número
-
-(define (distancia-bloque-dereita x punto-pj lista lista-e)
-  (define estado-m (pj-estado-m (xogo-pj x)))
-  (define estado-s (pj-estado-s (xogo-pj x)))
-  (cond
-    ((empty? lista)
-     (cond
-       ((empty? lista-e)
-        #f)
-       (else
-        (- (- (punto-x (punto-cadro->punto (argmin punto-c-x lista-e))) (/ l-cadrado 2))
-           (+ (punto-x punto-pj) (/ l-cadrado 2))))))
-    (else
-     (distancia-bloque-dereita
-      x punto-pj empty 
-      (filter (lambda (n)
-                (and
-                 (or
-                  (= (punto-c-y (punto->punto-cadro punto-pj)) (punto-c-y n))
-                  (if (and
-                       (member #\s estado-m)
-                       (equal? estado-s "floor"))
-                      #f
-                      (= (punto-c-y (punto->punto-cadro (sumar-y-punto (- 1  l-cadrado) punto-pj))) (punto-c-y n)))
-                  (= (punto-c-y (punto->punto-cadro (sumar-y-punto (- l-cadrado 1) punto-pj))) (punto-c-y n)))
-                 (<=  (- (- (punto-x punto-pj) (/ l-cadrado 2))
-                         (- (punto-x (punto-cadro->punto n)) (/ l-cadrado 2))) 
-                      0)
-                 ))
-              lista
-              )))))
-
-;imagenes cadrados
 
 (define cadrado-s (freeze (rectangle (+ l-cadrado 1) (+ l-cadrado 1) "solid" (make-color 50 50 50))))
 
@@ -789,19 +255,8 @@
                   (rectangle (* l-cadrado 0.75) (* l-cadrado 0.75) "outline" "red")
                   (rectangle l-cadrado l-cadrado "solid" transparente))))
 
-;;; STRUCT ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;estructuras - objectos
-
-(struct punto (x y) #:transparent)
-
-(struct pj (estado-m estado-s punto punto-pantalla) #:transparent)
-
-(struct xogo (pj temp vel-c cuadricula cadros-restantes estado carga conm p-mouse) #:transparent)
-
-
-;; to-draw ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+;; TO-DRAW :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 ;funcións necesarias:
 
@@ -809,8 +264,8 @@
 
 (define (pantalla-con-cadros cadrado lista fondo)
   (place-image cadrado
-               (punto-x (punto-cadro->punto (car lista)))
-               (punto-y (punto-cadro->punto (car lista)))
+               (punto-x (punto-cadro->punto (car lista) l-cadrado))
+               (punto-y (punto-cadro->punto (car lista) l-cadrado))
                (cond
                  ((empty? (cdr lista))
                   fondo)
@@ -829,8 +284,8 @@
         fondo)
        (else
         (place-image tipo-cadro
-                     (punto-x (punto-cadro->punto (car lista)))
-                     (punto-y (punto-cadro->punto (car lista)))
+                     (punto-x (punto-cadro->punto (car lista) l-cadrado))
+                     (punto-y (punto-cadro->punto (car lista) l-cadrado))
                      (cond
                        ((empty? (cdr lista))
                         fondo)
@@ -839,7 +294,7 @@
 
 ; pon os cadros das colisións (pulsar a tecla "C" mentras se xoga)
 
-(define (por-cadros-e bool x tipo-cadro  lista fondo)
+(define (por-cadros-e bool x tipo-cadro lista fondo)
   (cond 
     ((not bool)
      fondo)
@@ -851,19 +306,19 @@
         (place-image tipo-cadro
                      (cond
                        ((< (punto-x (pj-punto (xogo-pj x))) (/ ancho-fondo-ventana 2))
-                        (punto-x (punto-cadro->punto (car lista))))
+                        (punto-x (punto-cadro->punto (car lista) l-cadrado)))
                        ((> (punto-x (pj-punto (xogo-pj x))) (- ancho-fondo (/ ancho-fondo-ventana 2)))
-                        (- (punto-x (punto-cadro->punto (car lista))) (- ancho-fondo ancho-fondo-ventana)))
+                        (- (punto-x (punto-cadro->punto (car lista) l-cadrado)) (- ancho-fondo ancho-fondo-ventana)))
                        (else
-                        (- (punto-x (punto-cadro->punto (car lista))) (- (punto-x (pj-punto (xogo-pj x)))
+                        (- (punto-x (punto-cadro->punto (car lista) l-cadrado)) (- (punto-x (pj-punto (xogo-pj x)))
                                                                          (/ ancho-fondo-ventana 2)))))
                      (cond
                        ((< (punto-y (pj-punto (xogo-pj x))) (/ alto-fondo-ventana 2))
-                        (punto-y (punto-cadro->punto (car lista))))
+                        (punto-y (punto-cadro->punto (car lista) l-cadrado)))
                        ((> (punto-y (pj-punto (xogo-pj x))) (- alto-fondo (/ alto-fondo-ventana 2)))
-                        (- (punto-y (punto-cadro->punto (car lista))) (- alto-fondo alto-fondo-ventana)))
+                        (- (punto-y (punto-cadro->punto (car lista) l-cadrado)) (- alto-fondo alto-fondo-ventana)))
                        (else
-                        (- (punto-y (punto-cadro->punto (car lista))) (- (punto-y (pj-punto (xogo-pj x)))
+                        (- (punto-y (punto-cadro->punto (car lista) l-cadrado)) (- (punto-y (pj-punto (xogo-pj x)))
                                                                          (/ alto-fondo-ventana 2)))))
                      (cond
                        ((empty? (cdr lista))
@@ -896,18 +351,6 @@
                        (* (* l-cadrado 2) (/ n-c-ancho-ventana 35)) 
                        "solid" (if (equal? (xogo-estado x) "xogo->pantallas")
                                    "lightblue" "lightgray")))))
-
-;quitar ultimo elemento de unha lista
-;lista + empty -> lista
-
-(define (quitar-ultimo lista lista2)
-  (cond
-    ((empty? lista)
-     lista)
-    ((empty? (cdr lista))
-     (reverse lista2))
-    (else
-     (quitar-ultimo (cdr lista) (cons (car lista) lista2)))))
 
 ; barra de "carga" da pantalla inicial. (non se usa a carga)
 
@@ -1066,28 +509,27 @@
 (define (escalar x y imagen)
   (scale/xy (/ x (image-width imagen)) (/ y (image-height imagen)) imagen))
 
-;(define empty-s (freeze (empty-scene ancho-fondo-ventana alto-fondo-ventana (make-color 230 230 230))))
-
 (define empty-s 
   (cond
-    ((file-exists? "fondo-c3.jpg")
+    ((file-exists? "imaxes/fondo-c3.jpg")
      (freeze (escalar (+ (* ancho-fondo-ventana 1.2) (- n-c-ancho n-c-ancho-ventana))
                       (+ (* ancho-fondo-ventana 1.2) (- n-c-ancho n-c-ancho-ventana))
-                      (bitmap "fondo-c3.jpg"))))
+                      (bitmap "imaxes/fondo-c3.jpg"))))
     (else
      (freeze (rectangle (* ancho-fondo-ventana 1.2) (* alto-fondo-ventana 1.2) "solid" "white")))))
 
-;; on-key ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ON-KEY :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define punto-pj-c #f)
 (define punto-pj-pantalla-c #f)
 (define punto-y-comeza-salto #f)
 (define l-cadrado-edi 0)
 
-;; PRESIONAR 
+;; PRESIONAR ::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define (tecla x t)
-  (define distancia-bloque-enriba-c (distancia-bloque-enriba x (pj-punto (xogo-pj x)) lista-pasable empty))
+  (define distancia-bloque-enriba-c (distancia-bloque-enriba x (pj-punto (xogo-pj x)) lista-pasable empty l-cadrado))
   (cond
     ((member (xogo-estado x) (list "game over" "completado"))
      (cond
@@ -1097,7 +539,7 @@
           empty "floor"
           punto-inicial
           punto-inicial)
-         0 0 #f 500 "pantallas" 100 0))
+         0 0 #f 500 "pantallas" 100 0 #f))
        (else
         x)))
     ((member (xogo-estado x) (list "inicio" "xogo->pantallas"))
@@ -1132,7 +574,7 @@
                 1)
             #t)
            (equal? estado-s "floor"))
-          (when (file-exists? "salto.wav") (play-sound "salto.wav" #t))
+          (when (file-exists? "sonidos/salto.wav") (play-sound "sonidos/salto.wav" #t))
           "up")
          (else 
           estado-s))
@@ -1216,12 +658,12 @@
         (else
          (xogo-p-mouse x)))))))
 
-;; on-release ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;
 
 (define levantarse #f)
 (define agacharse #f)
 
-;; SOLTAR
+;; SOLTAR  ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define (soltar-tecla x t)
   (cond
@@ -1259,7 +701,8 @@
       (xogo-conm x)
       (xogo-p-mouse x)))))
 
-;; on-tick ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ON-TICK ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+;::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define lista-pasable empty)
 
@@ -1389,13 +832,13 @@
      (define estado-s (pj-estado-s (xogo-pj x)))
      (set! lista-pasable
            (coller-puntos-circundantes x 
-                                       (punto-c-x (punto->punto-cadro (pj-punto (xogo-pj x))))
-                                       (punto-c-y (punto->punto-cadro (pj-punto (xogo-pj x))))
-                                       VECTOR-PUNTOS-ORDENADOS))
-     (define distancia-bloque-enriba-c (distancia-bloque-enriba x (pj-punto (xogo-pj x)) lista-pasable empty))
-     (define distancia-bloque-abaixo-c (distancia-bloque-abaixo (pj-punto (xogo-pj x))  lista-pasable empty))
-     (define distancia-bloque-esquerda-c (distancia-bloque-esquerda x (pj-punto (xogo-pj x)) lista-pasable empty))
-     (define distancia-bloque-dereita-c (distancia-bloque-dereita x (pj-punto (xogo-pj x)) lista-pasable empty))
+                                       (punto-c-x (punto->punto-cadro (pj-punto (xogo-pj x)) l-cadrado))
+                                       (punto-c-y (punto->punto-cadro (pj-punto (xogo-pj x)) l-cadrado))
+                                       VECTOR-PUNTOS-ORDENADOS n-c-ancho (pj-estado-s (xogo-pj x)) (xogo-vel-c x) l-cadrado))
+     (define distancia-bloque-enriba-c (distancia-bloque-enriba x (pj-punto (xogo-pj x)) lista-pasable empty l-cadrado))
+     (define distancia-bloque-abaixo-c (distancia-bloque-abaixo (pj-punto (xogo-pj x))  lista-pasable empty l-cadrado))
+     (define distancia-bloque-esquerda-c (distancia-bloque-esquerda x (pj-punto (xogo-pj x)) lista-pasable empty l-cadrado))
+     (define distancia-bloque-dereita-c (distancia-bloque-dereita x (pj-punto (xogo-pj x)) lista-pasable empty l-cadrado))
      (xogo
       (pj
        (cond ;; estado-m
@@ -1689,7 +1132,7 @@
          (xogo-conm x)))
       (xogo-p-mouse x)))))
 
-;; stop-when
+;;; FUNCIÓNS DE FINALIZADO ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define (fora? x)
   (cond
@@ -1699,7 +1142,7 @@
      #f)
     (else
      (define punto-pj (pj-punto (xogo-pj x)))
-     (> (- (punto-c-y (punto->punto-cadro punto-pj)) 2) n-c-alto))))
+     (> (- (punto-c-y (punto->punto-cadro punto-pj l-cadrado)) 2) n-c-alto))))
 
 (define (ganar? x)
   (cond
@@ -1710,32 +1153,20 @@
     (else
      (or
       (and
-       (distancia-bloque-enriba x (pj-punto (xogo-pj x)) lista-puntos-ganar empty)
-       (< (distancia-bloque-enriba x (pj-punto (xogo-pj x)) lista-puntos-ganar empty) 0))
+       (distancia-bloque-enriba x (pj-punto (xogo-pj x)) lista-puntos-ganar empty l-cadrado)
+       (< (distancia-bloque-enriba x (pj-punto (xogo-pj x)) lista-puntos-ganar empty l-cadrado) 0))
       (and
-       (distancia-bloque-abaixo (pj-punto (xogo-pj x)) lista-puntos-ganar empty)
-       (< (distancia-bloque-abaixo (pj-punto (xogo-pj x)) lista-puntos-ganar empty) 0))
+       (distancia-bloque-abaixo (pj-punto (xogo-pj x)) lista-puntos-ganar empty l-cadrado)
+       (< (distancia-bloque-abaixo (pj-punto (xogo-pj x)) lista-puntos-ganar empty l-cadrado) 0))
       (and
-       (distancia-bloque-esquerda x (pj-punto (xogo-pj x)) lista-puntos-ganar empty)
-       (< (distancia-bloque-esquerda x (pj-punto (xogo-pj x)) lista-puntos-ganar empty) 0))
+       (distancia-bloque-esquerda x (pj-punto (xogo-pj x)) lista-puntos-ganar empty l-cadrado)
+       (< (distancia-bloque-esquerda x (pj-punto (xogo-pj x)) lista-puntos-ganar empty l-cadrado) 0))
       (and
-       (distancia-bloque-dereita x (pj-punto (xogo-pj x)) lista-puntos-ganar empty)
-       (< (distancia-bloque-dereita x (pj-punto (xogo-pj x)) lista-puntos-ganar empty) 0))))))
+       (distancia-bloque-dereita x (pj-punto (xogo-pj x)) lista-puntos-ganar empty l-cadrado)
+       (< (distancia-bloque-dereita x (pj-punto (xogo-pj x)) lista-puntos-ganar empty l-cadrado) 0))))))
 
-;;on-mouse-press
-
-;cadrado
-(define (cadrado n) (* n n))
-
-;distancia 2 puntos-c
-(define (dist-puntos-c p1 p2)
-  (sqrt (+ (cadrado (- (punto-c-x p2) (punto-c-x p1)))
-           (cadrado (- (punto-c-y p2) (punto-c-y p1))))))
-
-;distancia 2 puntos
-(define (dist-puntos p1 p2)
-  (sqrt (+ (cadrado (- (punto-x p2) (punto-x p1)))
-           (cadrado (- (punto-y p2) (punto-y p1))))))
+;;; ON-MOUSE :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+;:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 ;click en boton xogo?
 (define (clic-xogo? px py)
@@ -1746,6 +1177,8 @@
              (/ (* (* l-cadrado 2) (/ n-c-ancho-ventana 35)) 2)))
    (<= py (+ (/ alto-fondo-ventana 3)
              (/ (* (* l-cadrado 2) (/ n-c-ancho-ventana 35)) 2)))))
+
+;;; PULSAR :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define (mouse x px py boton)
   (cond
@@ -1790,18 +1223,18 @@
      (cond 
        ((and
          (xogo-cuadricula x)
-         (> (dist-puntos (punto-cadro->punto (punto->punto-cadro (punto px-v py-v))) (pj-punto (xogo-pj x))) l-cadrado)
-         (not (member (punto->punto-cadro (punto px-v py-v)) lista-puntos))
-         (not (member (punto->punto-cadro (punto px-v py-v)) lista-puntos-creados))
+         (> (dist-puntos (punto-cadro->punto (punto->punto-cadro (punto px-v py-v) l-cadrado) l-cadrado) (pj-punto (xogo-pj x))) l-cadrado)
+         (not (member (punto->punto-cadro (punto px-v py-v) l-cadrado) lista-puntos))
+         (not (member (punto->punto-cadro (punto px-v py-v) l-cadrado) lista-puntos-creados))
          (> (xogo-cadros-restantes x) 0))
-        (set! lista-puntos-creados (cons (punto->punto-cadro (punto px-v py-v)) lista-puntos-creados))
+        (set! lista-puntos-creados (cons (punto->punto-cadro (punto px-v py-v) l-cadrado) lista-puntos-creados))
         (set! VECTOR-PUNTOS-ORDENADOS 
-              (por-e-vector (list (punto->punto-cadro (punto px-v py-v))) 
+              (por-e-vector (list (punto->punto-cadro (punto px-v py-v) l-cadrado)) 
                             (inexact->exact (+ (floor (/ px-v l-cadrado)) 
                                                (* (floor (/ py-v l-cadrado)) n-c-ancho)))
                             VECTOR-PUNTOS-ORDENADOS))
         (set! fondo-estatico
-              (freeze  (por-cadros #t cadrado-s-2 (list (punto->punto-cadro (punto px-v py-v))) fondo-estatico))) 
+              (freeze  (por-cadros #t cadrado-s-2 (list (punto->punto-cadro (punto px-v py-v) l-cadrado)) fondo-estatico))) 
         (set! fondo-estatico-cuadricula
               (freeze (por-cuadricula #t fondo-estatico)))
         (xogo
@@ -1817,7 +1250,7 @@
        (else
         x)))))
 
-;; SOLTAR BOTÓN DO RATÓN
+;; SOLTAR ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define (soltar-mouse x px py boton)
   (cond
@@ -1849,7 +1282,7 @@
       (xogo-p-mouse x)))))
 
 
-;; RODA DO RATÓN CARA ADIANTE
+;; RODA DO RATÓN CARA ADIANTE  ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define zoom 0)
 
@@ -1870,7 +1303,7 @@
     (else
      x)))
 
-;; RODA DO RATÓN CARA ATRÁS
+;; RODA DO RATÓN CARA ATRÁS  ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define (roda-atras x)
   (cond
@@ -1902,7 +1335,7 @@
     (else
      x)))
 
-;; MOVEMENTO DO RATÓN
+;; MOVEMENTO DO RATÓN  ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define (mover-mouse x px py)
   (cond
