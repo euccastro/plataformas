@@ -1364,7 +1364,7 @@
             empty "floor"
             punto-inicial
             punto-inicial)
-           0 0 #f 500 "cargando" 100 0 #f)
+           0 0 #f 500 "inicio" 100 0 #f)
           'on-draw pantalla-xogo
           'on-key-press tecla
           'on-key-release soltar-tecla
