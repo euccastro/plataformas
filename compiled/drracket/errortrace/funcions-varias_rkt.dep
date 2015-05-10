@@ -1,0 +1,1 @@
+("6.1.1" ("607fc2c009bb6bd3e85253f2230413d7e99f312c" . "08ae210410e0f528bb843e4f71700b91454579db") (collects #"2htdp" #"image.rkt") (collects #"racket" #"main.rkt") (collects #"racket" #"runtime-config.rkt") #"C:\\Users\\Usuario\\Desktop\\Xogo plataformas\\structs.rkt")
