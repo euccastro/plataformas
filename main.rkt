@@ -61,13 +61,13 @@
 
 ;;teclas de movemento:
 
-(define tecla-salto '(#\w up #\space))
+(define tecla-salto '(#\w #\W up #\space))
 
-(define tecla-agacharse '(#\s down))
+(define tecla-agacharse '(#\s #\S down))
 
-(define tecla-dereita '(#\d right))
+(define tecla-dereita '(#\d #\D right))
 
-(define tecla-esquerda '(#\a left))
+(define tecla-esquerda '(#\a #\A left))
 
 ;; LISTA PUNTOS ;;
 
@@ -311,7 +311,7 @@
                         (- (punto-x (punto-cadro->punto (car lista) l-cadrado)) (- ancho-fondo ancho-fondo-ventana)))
                        (else
                         (- (punto-x (punto-cadro->punto (car lista) l-cadrado)) (- (punto-x (pj-punto (xogo-pj x)))
-                                                                         (/ ancho-fondo-ventana 2)))))
+                                                                                   (/ ancho-fondo-ventana 2)))))
                      (cond
                        ((< (punto-y (pj-punto (xogo-pj x))) (/ alto-fondo-ventana 2))
                         (punto-y (punto-cadro->punto (car lista) l-cadrado)))
@@ -319,7 +319,7 @@
                         (- (punto-y (punto-cadro->punto (car lista) l-cadrado)) (- alto-fondo alto-fondo-ventana)))
                        (else
                         (- (punto-y (punto-cadro->punto (car lista) l-cadrado)) (- (punto-y (pj-punto (xogo-pj x)))
-                                                                         (/ alto-fondo-ventana 2)))))
+                                                                                   (/ alto-fondo-ventana 2)))))
                      (cond
                        ((empty? (cdr lista))
                         fondo)
@@ -529,6 +529,7 @@
 ;; PRESIONAR ::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define (tecla x t)
+  (print t)
   (define distancia-bloque-enriba-c (distancia-bloque-enriba x (pj-punto (xogo-pj x)) lista-pasable empty l-cadrado))
   (cond
     ((member (xogo-estado x) (list "game over" "completado"))
@@ -582,21 +583,21 @@
          ((and
            (equal? t #\v)
            (not (equal? (xogo-estado x) "edicion")))
-         (punto
-         (cond
-           ((< punto-pj-x (/ ancho-fondo-ventana 2))
-            (/ ancho-fondo-ventana 2))
-           ((> punto-pj-x (- ancho-fondo (/ ancho-fondo-ventana 2)))
-            (- ancho-fondo (/ ancho-fondo-ventana 2)))
-           (else
-            punto-pj-x))
-         (cond
-           ((< punto-pj-y (/ alto-fondo-ventana 2))
-            (/ alto-fondo-ventana 2))
-           ((> punto-pj-y (- alto-fondo (/ alto-fondo-ventana 2)))
-            (- alto-fondo (/ alto-fondo-ventana 2)))
-           (else
-            punto-pj-y))))
+          (punto
+           (cond
+             ((< punto-pj-x (/ ancho-fondo-ventana 2))
+              (/ ancho-fondo-ventana 2))
+             ((> punto-pj-x (- ancho-fondo (/ ancho-fondo-ventana 2)))
+              (- ancho-fondo (/ ancho-fondo-ventana 2)))
+             (else
+              punto-pj-x))
+           (cond
+             ((< punto-pj-y (/ alto-fondo-ventana 2))
+              (/ alto-fondo-ventana 2))
+             ((> punto-pj-y (- alto-fondo (/ alto-fondo-ventana 2)))
+              (- alto-fondo (/ alto-fondo-ventana 2)))
+             (else
+              punto-pj-y))))
          ((and
            (equal? t #\v)
            (equal? (xogo-estado x) "edicion"))
@@ -750,28 +751,28 @@
                    [struct-copy pj (xogo-pj x)
                                 [punto
                                  (punto
-                                 (cond
-                                   ((and
-                                     (> (punto-x (xogo-p-mouse x)) (+ (/ ancho-fondo-ventana 2) (/ ancho-fondo-ventana 8)))
-                                     (< punto-pj-x (- ancho-fondo (/ ancho-fondo-ventana 2))))
-                                    (+ punto-pj-x (/ (punto-x (xogo-p-mouse x)) 50)))
-                                   ((and
-                                     (< (punto-x (xogo-p-mouse x)) (- (/ ancho-fondo-ventana 2) (/ ancho-fondo-ventana 8)))
-                                     (> punto-pj-x (/ ancho-fondo-ventana 2)))
-                                    (- punto-pj-x (/ (- ancho-fondo-ventana (punto-x (xogo-p-mouse x))) 50)))
-                                   (else
-                                    punto-pj-x))
-                                 (cond
-                                   ((and
-                                     (> (punto-y (xogo-p-mouse x)) (+ (/ alto-fondo-ventana 2) (/ alto-fondo-ventana 10)))
-                                     (< punto-pj-y (- alto-fondo (/ alto-fondo-ventana 2))))
-                                    (+ punto-pj-y (/ (punto-y (xogo-p-mouse x)) 50)))
-                                   ((and
-                                     (< (punto-y (xogo-p-mouse x)) (- (/ alto-fondo-ventana 2) (/ alto-fondo-ventana 10)))
-                                     (> punto-pj-y (/ alto-fondo-ventana 2)))
-                                    (- punto-pj-y (/ (- alto-fondo-ventana (punto-y (xogo-p-mouse x))) 50)))
-                                   (else
-                                    punto-pj-y)))]
+                                  (cond
+                                    ((and
+                                      (> (punto-x (xogo-p-mouse x)) (+ (/ ancho-fondo-ventana 2) (/ ancho-fondo-ventana 8)))
+                                      (< punto-pj-x (- ancho-fondo (/ ancho-fondo-ventana 2))))
+                                     (+ punto-pj-x (/ (punto-x (xogo-p-mouse x)) 50)))
+                                    ((and
+                                      (< (punto-x (xogo-p-mouse x)) (- (/ ancho-fondo-ventana 2) (/ ancho-fondo-ventana 8)))
+                                      (> punto-pj-x (/ ancho-fondo-ventana 2)))
+                                     (- punto-pj-x (/ (- ancho-fondo-ventana (punto-x (xogo-p-mouse x))) 50)))
+                                    (else
+                                     punto-pj-x))
+                                  (cond
+                                    ((and
+                                      (> (punto-y (xogo-p-mouse x)) (+ (/ alto-fondo-ventana 2) (/ alto-fondo-ventana 10)))
+                                      (< punto-pj-y (- alto-fondo (/ alto-fondo-ventana 2))))
+                                     (+ punto-pj-y (/ (punto-y (xogo-p-mouse x)) 50)))
+                                    ((and
+                                      (< (punto-y (xogo-p-mouse x)) (- (/ alto-fondo-ventana 2) (/ alto-fondo-ventana 10)))
+                                      (> punto-pj-y (/ alto-fondo-ventana 2)))
+                                     (- punto-pj-y (/ (- alto-fondo-ventana (punto-y (xogo-p-mouse x))) 50)))
+                                    (else
+                                     punto-pj-y)))]
                                 [punto-pantalla
                                  (punto
                                   (cond
@@ -842,6 +843,8 @@
      (xogo
       (pj
        (cond ;; estado-m
+         (cambiando-tamaño
+          empty)
          ((equal? levantarse #t)
           (set! levantarse #f)
           (remove #\s estado-m))
@@ -1067,10 +1070,13 @@
               (if cambiando-tamaño 
                   (* (/ punto-pj-y l-cadrado-a) l-cadrado)
                   punto-pj-y))
+             ((and
+               (>= (* (/ punto-pj-y l-cadrado-a) l-cadrado) (- alto-fondo (/ alto-fondo-ventana 2)))
+               cambiando-tamaño)
+              (- (* (/ punto-pj-y l-cadrado-a) l-cadrado) 
+                 (- alto-fondo alto-fondo-ventana)))
              ((>= punto-pj-y (- alto-fondo (/ alto-fondo-ventana 2)))
-              (- (if cambiando-tamaño
-                     (* (/ punto-pj-y l-cadrado-a) l-cadrado)
-                     punto-pj-y)
+              (- punto-pj-y
                  (- alto-fondo alto-fondo-ventana)))
              (else
               (/ alto-fondo-ventana 2)))))
@@ -1366,13 +1372,4 @@
           ;'tick-interval (/ 1 40)
           ;'stop-when
           )
-
-
-;;;;FUNCIÓNS PARA GARDAR UN ARQUIVO
-
-;(require racket/file)
-
-;(file->string path [#:mode mode-flag]) → string?
-;  path : path-string?
-;  mode-flag : (or/c 'binary 'text) = 'binary
 
