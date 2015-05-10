@@ -1354,6 +1354,11 @@
 
 (define punto-inicial (punto (- l-cadrado (/ ancho-pj-i 2)) 1))
 
+(define (hai-que-repintar? velho novo)
+  (or
+      (xogo-cuadricula novo)
+      (not (equal? (xogo-pj velho) (xogo-pj novo)))))
+
 (big-bong (xogo 
            (pj 
             empty "floor"
@@ -1369,6 +1374,7 @@
           'on-wheel-down roda-atras
           'on-wheel-up roda-adiante
           'on-tick tick
+          'needs-repaint? hai-que-repintar?
           ;'tick-interval (/ 1 40)
           ;'stop-when
           )
