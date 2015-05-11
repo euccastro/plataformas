@@ -529,6 +529,7 @@
 ;; PRESIONAR ::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define (tecla x t)
+  (print t)
   (define distancia-bloque-enriba-c (distancia-bloque-enriba x (pj-punto (xogo-pj x)) lista-pasable empty l-cadrado))
   (cond
     ((member (xogo-estado x) (list "game over" "completado"))
@@ -1353,12 +1354,17 @@
 
 (define punto-inicial (punto (- l-cadrado (/ ancho-pj-i 2)) 1))
 
+(define (hai-que-repintar? velho novo)
+  (or
+      (xogo-cuadricula novo)
+      (not (equal? (xogo-pj velho) (xogo-pj novo)))))
+
 (big-bong (xogo 
            (pj 
             empty "floor"
             punto-inicial
             punto-inicial)
-           0 0 #f 500 "cargando" 100 0 #f)
+           0 0 #f 500 "inicio" 100 0 #f)
           'on-draw pantalla-xogo
           'on-key-press tecla
           'on-key-release soltar-tecla
@@ -1368,7 +1374,7 @@
           'on-wheel-down roda-atras
           'on-wheel-up roda-adiante
           'on-tick tick
+          'needs-repaint? hai-que-repintar?
           ;'tick-interval (/ 1 40)
           ;'stop-when
           )
-
