@@ -529,7 +529,6 @@
 ;; PRESIONAR ::::::::::::::::::::::::::::::::::::::::::::::::::::
 
 (define (tecla x t)
-  (print t)
   (define distancia-bloque-enriba-c (distancia-bloque-enriba x (pj-punto (xogo-pj x)) lista-pasable empty l-cadrado))
   (cond
     ((member (xogo-estado x) (list "game over" "completado"))
