@@ -549,7 +549,7 @@
      (define punto-pj-y (punto-y (pj-punto (xogo-pj x))))
      (define estado-m (pj-estado-m (xogo-pj x)))
      (define estado-s (pj-estado-s (xogo-pj x)))
-     (when (equal? t #\return) (display (puntos->texto lista-puntos-creados)))
+     ;(when (equal? t #\return) (display (puntos->texto lista-puntos-creados)))
      (when (and (member t tecla-agacharse)
                 (not (equal? (xogo-estado x) "edicion")))
        (set! agacharse #t))
