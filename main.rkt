@@ -33,7 +33,7 @@
 
 (define cambiando-tamaño #f)
 
-(define movemento-lateral (/ l-cadrado 3.5))
+(define movemento-lateral (/ l-cadrado 4))
 
 (define movemento-salto (/ l-cadrado 4))
 
@@ -153,7 +153,7 @@
                  (overlay
                   (rectangle (* l-cadrado 0.75) (* l-cadrado 0.75) "outline" "red")
                   (rectangle l-cadrado l-cadrado "solid" transparente))))
-  (set! movemento-lateral (/ l-cadrado 3.5))
+  (set! movemento-lateral (/ l-cadrado 4))
   (set! movemento-salto (/ l-cadrado 4))
   (set! rectangulo-pj-normal
         (freeze
@@ -1228,7 +1228,7 @@
      (cond 
        ((and
          (xogo-cuadricula x)
-         (> (dist-puntos (punto-cadro->punto (punto->punto-cadro (punto px-v py-v) l-cadrado) l-cadrado) (pj-punto (xogo-pj x))) l-cadrado)
+         ;(> (dist-puntos (punto-cadro->punto (punto->punto-cadro (punto px-v py-v) l-cadrado) l-cadrado) (pj-punto (xogo-pj x))) l-cadrado)
          (not (member (punto->punto-cadro (punto px-v py-v) l-cadrado) lista-puntos))
          (not (member (punto->punto-cadro (punto px-v py-v) l-cadrado) lista-puntos-creados))
          (> (xogo-cadros-restantes x) 0))
@@ -1358,7 +1358,7 @@
             empty "floor"
             punto-inicial
             punto-inicial)
-           0 0 #f 500 "cargando" 100 0 #f)
+           0 0 #f 5000 "cargando" 100 0 #f)
           'on-draw pantalla-xogo
           'on-key-press tecla
           'on-key-release soltar-tecla
