@@ -18,12 +18,6 @@
       (number->string (punto-c-x (car lista-puntos))) "_" (number->string (punto-c-y (car lista-puntos))) ":"
       (puntos->texto (cdr lista-puntos))))))
 
-(provide puntos->texto)
-
-(define l (list (punto-c 1 1) (punto-c 0 1) (punto-c 2 9) (punto-c 12 34) (punto-c 100 23)))
-
-(define t (puntos->texto l))
-
 ;detectar punto
 ;texto + número(0) -> número
 
@@ -70,12 +64,16 @@
 
 ;gardar texto en un arquivo:
 
-(write-to-file (puntos->texto l) "proba.txt")
+;(write-to-file (puntos->texto l) "proba.txt")
 
 ;cargar texto de un arquivo:
 
-(texto->l-puntos (file->value "proba.txt"))
+;(texto->l-puntos (file->value "proba.txt"))
 
-(delete-file "proba.txt")
+;;exportar
+
+(provide puntos->texto)
+
+(provide texto->l-puntos)
 
 
