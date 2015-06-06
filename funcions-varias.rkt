@@ -21,20 +21,6 @@
 
 (provide por-e-vector)
 
-;;convertir puntos en texto
-;lista
-
-(define (puntos->texto lista-puntos)
-  (cond 
-    ((empty? lista-puntos)
-     "")
-    (else
-     (string-append 
-      "(punto-c " (number->string (punto-c-x (car lista-puntos))) " " (number->string (punto-c-y (car lista-puntos))) ") "
-      (puntos->texto (cdr lista-puntos))))))
-
-(provide puntos->texto)
-
 ;;voltear lista
 ;lista + lista(empty) -> lista
 
