@@ -24,9 +24,7 @@
 
 (define n-c-ancho-ventana 80)
 
-;;relacion -> n-c-alto-ventana = (/ n-c-ancho 2)
-
-(define n-c-alto-ventana 40)
+(define n-c-alto-ventana (quotient n-c-ancho-ventana 2))
 
 (define ancho-inicial (* l-cadrado n-c-ancho-ventana))
 
